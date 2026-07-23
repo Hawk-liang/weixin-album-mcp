@@ -139,6 +139,10 @@ src/
     └── weixin-api.ts                # WeChat album API client with pagination
 ```
 
+## 致谢
+
+本项目功能受 [opencli-weixin-album](https://github.com/SlowGrowth1314/opencli-weixin-album) 启发，针对 Claude Code MCP 协议完全重新实现。感谢原作者的创意和 MIT 开源许可。
+
 ## License
 
 MIT
