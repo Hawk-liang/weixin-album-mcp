@@ -20,18 +20,26 @@ Port of [opencli-weixin-album](https://github.com/SlowGrowth1314/opencli-weixin-
 
 ## Installation
 
+### 方式一：Claude Code 插件市场安装（推荐）
+
 ```bash
-# 1. Clone the repository
+# 在 Claude Code 中输入：
+/plugin install weixin-album
+```
+
+插件会自动安装并注册 MCP 服务器，无需手动配置。
+
+### 方式二：手动安装
+
+```bash
+# 1. 克隆仓库
 git clone https://github.com/<user>/opencli-weixin-album-mcp.git
 cd opencli-weixin-album-mcp
 
-# 2. Install dependencies
+# 2. 安装依赖
 npm install
 
-# 3. Compile TypeScript
-npm run build
-
-# 4. Install Playwright Chromium
+# 3. 安装 Playwright Chromium
 npx playwright install chromium
 ```
 
