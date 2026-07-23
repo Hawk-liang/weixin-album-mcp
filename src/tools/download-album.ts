@@ -5,6 +5,7 @@ import {
   isLocalIndexPath,
   sanitizeFilename,
   sleep,
+  formatErrorMessage,
 } from '../lib/utils.js';
 import { fetchAllArticles, type AlbumArticle } from '../lib/weixin-api.js';
 import {
@@ -152,7 +153,7 @@ export async function handleDownloadAlbum(args: {
       content: [
         {
           type: 'text',
-          text: `❌ **获取文章列表失败**: ${err instanceof Error ? err.message : String(err)}`,
+          text: `❌ **获取文章列表失败**: ${formatErrorMessage(err)}`,
         },
       ],
     };

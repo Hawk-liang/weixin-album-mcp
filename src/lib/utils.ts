@@ -89,3 +89,25 @@ export function sanitizeFilename(name: string): string {
 export function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
+
+// ============================================================
+// Error Formatting
+// ============================================================
+
+/**
+ * Format an error into a human-readable string, surfacing the underlying cause.
+ * Node's fetch throws `TypeError: fetch failed` with the real reason (e.g. a
+ * TLS certificate error) buried in `err.cause` — including it here makes
+ * network failures debuggable instead of showing only "fetch failed".
+ */
+export function formatErrorMessage(err: unknown): string {
+  if (!(err instanceof Error)) return String(err);
+  const cause = (err as Error & { cause?: unknown }).cause;
+  if (cause instanceof Error) {
+    return `${err.message} (${cause.message})`;
+  }
+  if (cause !== undefined && cause !== null) {
+    return `${err.message} (${String(cause)})`;
+  }
+  return err.message;
+}

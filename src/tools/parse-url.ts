@@ -1,4 +1,4 @@
-import { parseAlbumUrl, isLocalIndexPath } from '../lib/utils.js';
+import { parseAlbumUrl, isLocalIndexPath, formatErrorMessage } from '../lib/utils.js';
 import { fetchAllArticles } from '../lib/weixin-api.js';
 
 // ============================================================
@@ -106,7 +106,7 @@ export async function handleParseUrl(args: { url: string }): Promise<{
       content: [
         {
           type: 'text',
-          text: `❌ **获取合集信息失败**: ${err instanceof Error ? err.message : String(err)}`,
+          text: `❌ **获取合集信息失败**: ${formatErrorMessage(err)}`,
         },
       ],
     };

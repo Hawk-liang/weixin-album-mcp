@@ -74,7 +74,10 @@ export async function fetchAlbumPage(
     apiUrl += `&begin_msgid=${cursor.msgid}&begin_itemidx=${cursor.itemidx}`;
   }
 
-  const response = await fetch(apiUrl, { headers: API_HEADERS });
+  const response = await fetch(apiUrl, {
+    headers: API_HEADERS,
+    signal: AbortSignal.timeout(30000),
+  });
   if (!response.ok) {
     throw new Error(`WeChat API request failed: HTTP ${response.status}`);
   }
