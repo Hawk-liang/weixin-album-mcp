@@ -2,6 +2,9 @@
   "weixin-album": {
     "command": "node",
     "args": ["dist/index.js"],
+    "env": {
+      "NODE_EXTRA_CA_CERTS": "/etc/ssl/cert.pem"
+    },
     "description": "下载微信公众号合集文章，生成 Markdown 索引"
   }
 }
