@@ -36,7 +36,7 @@ Port of [opencli-weixin-album](https://github.com/SlowGrowth1314/opencli-weixin-
 
 ```bash
 # 1. 克隆仓库
-git clone https://github.com/<user>/opencli-weixin-album-mcp.git
+git clone https://github.com/Hawk-liang/opencli-weixin-album-mcp.git
 cd opencli-weixin-album-mcp
 
 # 2. 安装依赖
