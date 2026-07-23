@@ -14,53 +14,74 @@ export interface DownloadResult {
 }
 
 // ============================================================
-// Image Download
+// Image Download (Node fetch — avoids browser mixed-content/CORS limits)
 // ============================================================
 
 /**
- * Download an image from a URL to the local filesystem.
- * Handles data: URIs and http/https URLs.
+ * Map an image content-type (or URL) to a file extension.
+ */
+function imageExtension(contentType: string, url: string): string {
+  const ct = contentType.toLowerCase();
+  if (ct.includes('jpeg') || ct.includes('jpg')) return 'jpg';
+  if (ct.includes('webp')) return 'webp';
+  if (ct.includes('gif')) return 'gif';
+  if (ct.includes('png')) return 'png';
+  // Fallback: infer from URL path (WeChat URLs end with /wx_fmt=jpeg etc. or .png)
+  const fmtMatch = url.match(/wx_fmt=(\w+)/);
+  if (fmtMatch) {
+    const f = fmtMatch[1].toLowerCase();
+    if (f === 'jpeg') return 'jpg';
+    return f;
+  }
+  const extMatch = url.match(/\.(jpg|jpeg|png|gif|webp)/i);
+  if (extMatch) return extMatch[1].toLowerCase().replace('jpeg', 'jpg');
+  return 'png';
+}
+
+/**
+ * Download an image URL to the local filesystem.
+ * Uses Node fetch (not the browser context) so it is not subject to the
+ * page's mixed-content blocking or cross-origin restrictions. Upgrades
+ * http:// to https:// to avoid mixed-content failures.
  */
 async function downloadImage(
-  page: import('playwright').Page,
   imgUrl: string,
   savePath: string,
+  referer: string,
 ): Promise<string | undefined> {
+  // data: URI
   if (imgUrl.startsWith('data:')) {
-    // Data URI — extract base64 content
     const match = imgUrl.match(/^data:image\/(\w+);base64,(.+)$/);
     if (match) {
       const ext = match[1] === 'jpeg' ? 'jpg' : match[1];
-      const data = Buffer.from(match[2], 'base64');
-      fs.writeFileSync(savePath.replace(/\.\w+$/, `.${ext}`), data);
+      fs.writeFileSync(savePath.replace(/\.\w+$/, `.${ext}`), Buffer.from(match[2], 'base64'));
       return ext;
     }
     return undefined;
   }
 
-  // HTTP URL — fetch via the page context (handles cookies/referrer)
-  const response = await page.evaluate(async (url) => {
-    const res = await fetch(url);
-    if (!res.ok) return null;
-    const blob = await res.blob();
-    // Convert blob to base64 for transfer out of browser context
-    return new Promise<string | null>((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.onerror = () => resolve(null);
-      reader.readAsDataURL(blob);
-    });
-  }, imgUrl);
+  // Upgrade http -> https (mixed-content safe)
+  const url = imgUrl.startsWith('http://') ? 'https://' + imgUrl.slice(7) : imgUrl;
 
-  if (!response) return undefined;
+  const res = await fetch(url, {
+    headers: {
+      'User-Agent':
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+      Referer: referer,
+    },
+    signal: AbortSignal.timeout(30000),
+  });
 
-  const base64Match = response.match(/^data:image\/(\w+);base64,(.+)$/);
-  if (base64Match) {
-    const ext = base64Match[1] === 'jpeg' ? 'jpg' : base64Match[1];
-    fs.writeFileSync(savePath.replace(/\.\w+$/, `.${ext}`), Buffer.from(base64Match[2], 'base64'));
-    return ext;
-  }
-  return undefined;
+  if (!res.ok) return undefined;
+
+  const contentType = res.headers.get('content-type') || '';
+  // Guard against non-image responses (e.g. HTML error pages)
+  if (!contentType.startsWith('image/')) return undefined;
+
+  const ext = imageExtension(contentType, url);
+  const buf = Buffer.from(await res.arrayBuffer());
+  fs.writeFileSync(savePath.replace(/\.\w+$/, `.${ext}`), buf);
+  return ext;
 }
 
 // ============================================================
@@ -73,7 +94,7 @@ async function downloadImage(
  * 1. Launches headless browser
  * 2. Navigates to the article URL
  * 3. Waits for #js_content to render
- * 4. Extracts article HTML, converts to Markdown
+ * 4. Extracts article HTML + ordered image URLs, converts to Markdown
  * 5. Downloads all images to images/ subdirectory
  * 6. Saves the .md file
  *
@@ -104,23 +125,30 @@ export async function downloadArticle(
       return el?.textContent?.trim() || 'untitled';
     });
 
-    // Extract article content as Markdown-like text
-    let markdown = await page.evaluate(() => {
+    // Extract article content as Markdown AND the ordered list of real image
+    // URLs, in a single pass over the same cloned DOM so the Markdown image
+    // indices and the downloaded files always line up.
+    const { markdown: rawMarkdown, imageUrls } = await page.evaluate(() => {
       const content = document.querySelector('#js_content');
-      if (!content) return '';
+      if (!content) return { markdown: '', imageUrls: [] as string[] };
 
       // Clone to avoid mutating the live DOM
       const clone = content.cloneNode(true) as HTMLElement;
 
-      // Process images — replace lazy-load data-src with src and assign indices
-      clone.querySelectorAll('img').forEach((img, idx) => {
-        const dataSrc = img.getAttribute('data-src');
-        if (dataSrc && !img.getAttribute('src')) {
-          img.setAttribute('src', dataSrc);
-        }
-        const src = img.getAttribute('src') || img.getAttribute('data-src');
-        if (src) {
-          img.setAttribute('data-img-index', String(idx));
+      // Assign a stable sequential index to each <img> that has a real URL.
+      // imgs without a real URL (pure placeholders) are skipped entirely so
+      // they don't create gaps or collisions in the numbering.
+      let imgCounter = 0;
+      clone.querySelectorAll('img').forEach((img) => {
+        const url =
+          (img.getAttribute('data-src') && /^https?:\/\//.test(img.getAttribute('data-src')!)
+            ? img.getAttribute('data-src')
+            : img.getAttribute('src') && /^https?:\/\//.test(img.getAttribute('src')!)
+              ? img.getAttribute('src')
+              : null) ?? null;
+        if (url) {
+          img.setAttribute('data-img-index', String(imgCounter));
+          imgCounter++;
         }
       });
 
@@ -136,7 +164,6 @@ export async function downloadArticle(
       ]);
 
       // Track formatting state for bold/italic since TreeWalker has no exit callback.
-      // Markers are opened/closed based on the ancestor chain of each text node.
       let isBold = false;
       let isItalic = false;
 
@@ -155,18 +182,14 @@ export async function downloadArticle(
         return { bold, italic };
       }
 
-      // Start from the first child of the container, not the container itself,
-      // to avoid leading newlines from the root block element.
       let node: Node | null = walker.nextNode();
       while (node) {
         if (node.nodeType === Node.TEXT_NODE) {
           const t = node.textContent || '';
           if (t.trim()) {
             const fmt = getFormatting(node);
-            // Close markers in reverse order when leaving a formatting element
             if (isItalic && !fmt.italic) text += '*';
             if (isBold && !fmt.bold) text += '**';
-            // Open markers (bold outer, italic inner)
             if (!isBold && fmt.bold) text += '**';
             if (!isItalic && fmt.italic) text += '*';
             isBold = fmt.bold;
@@ -181,8 +204,10 @@ export async function downloadArticle(
             text += '\n';
           } else if (tag === 'IMG') {
             const idx = el.getAttribute('data-img-index');
-            const alt = el.getAttribute('alt') || '';
-            text += `\n\n![${alt}](images/img_${String(Number(idx) + 1).padStart(3, '0')}.png)\n\n`;
+            if (idx !== null) {
+              const alt = el.getAttribute('alt') || '';
+              text += `\n\n![${alt}](images/img_${String(Number(idx) + 1).padStart(3, '0')}.png)\n\n`;
+            }
           } else if (tag === 'A') {
             const href = el.getAttribute('href') || '';
             const linkText = el.textContent?.trim() || '';
@@ -190,17 +215,31 @@ export async function downloadArticle(
           } else if (blockTags.has(tag)) {
             text += '\n\n';
           }
-          // STRONG, B, EM, I are handled via getFormatting on text nodes
         }
         node = walker.nextNode();
       }
 
-      // Close any formatting markers that are still open at the end of the document
       if (isItalic) text += '*';
       if (isBold) text += '**';
 
-      // Clean up excessive newlines
-      return text.replace(/\n{3,}/g, '\n\n').trim();
+      text = text.replace(/\n{3,}/g, '\n\n').trim();
+
+      // Collect the ordered image URLs from the same clone, matching the
+      // indices assigned above.
+      const imageUrls: string[] = [];
+      clone.querySelectorAll('img').forEach((img) => {
+        if (img.getAttribute('data-img-index') !== null) {
+          const url =
+            (img.getAttribute('data-src') && /^https?:\/\//.test(img.getAttribute('data-src')!)
+              ? img.getAttribute('data-src')
+              : img.getAttribute('src') && /^https?:\/\//.test(img.getAttribute('src')!)
+                ? img.getAttribute('src')
+                : null) ?? null;
+          if (url) imageUrls.push(url);
+        }
+      });
+
+      return { markdown: text, imageUrls };
     });
 
     const safeTitle = sanitizeFilename(title);
@@ -208,18 +247,14 @@ export async function downloadArticle(
     const imagesDir = path.join(articleDir, 'images');
     fs.mkdirSync(imagesDir, { recursive: true });
 
-    // Download images
-    const imgElements = await page.$$('#js_content img');
-    for (let i = 0; i < imgElements.length; i++) {
-      const src = await imgElements[i].getAttribute('src');
-      const dataSrc = await imgElements[i].getAttribute('data-src');
-      const imgUrl = src || dataSrc;
-      if (!imgUrl) continue;
+    let markdown = rawMarkdown;
 
+    // Download images — index aligns with the Markdown references
+    for (let i = 0; i < imageUrls.length; i++) {
       const imgName = `img_${String(i + 1).padStart(3, '0')}`;
       const imgPath = path.join(imagesDir, `${imgName}.png`);
       try {
-        const actualExt = await downloadImage(page, imgUrl, imgPath);
+        const actualExt = await downloadImage(imageUrls[i], imgPath, articleUrl);
         if (actualExt && actualExt !== 'png') {
           markdown = markdown.replace(
             new RegExp(`${imgName}\\.png`, 'g'),
