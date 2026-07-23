@@ -18,21 +18,43 @@ Port of [opencli-weixin-album](https://github.com/SlowGrowth1314/opencli-weixin-
 - Node.js >= 18
 - Playwright Chromium (installed automatically with the project)
 
-## Installation
+## 安装
 
-### 方式一：Claude Code 插件市场安装（推荐）
+### 第一步：添加插件市场
+
+1. 打开 Claude Code
+2. 点击右上角 ⚙️ 齿轮图标 → **Manage Plugins**
+3. 切换到 **Marketplaces** 标签页
+4. 点击 **Add Marketplace** 按钮
+5. 输入 `Hawk-liang/weixin-album-mcp` 并确认
+
+### 第二步：安装插件
+
+1. 切换到 **Plugins** 标签页
+2. 搜索 `weixin-album`
+3. 点击 **Install** 按钮
+
+插件会自动安装依赖并注册 MCP 服务器，无需手动配置。
+
+### 第三步：安装 Chromium 浏览器
 
 ```bash
-# 1. 先添加本仓库为插件市场
-/plugin marketplace add Hawk-liang/weixin-album-mcp
-
-# 2. 安装插件
-/plugin install weixin-album@weixin-album-mcp
+npx playwright install chromium
 ```
 
-插件会自动安装并注册 MCP 服务器，无需手动配置。
+> 此步骤需要在终端中执行一次，Playwright 才能正常工作。
 
-### 方式二：手动安装
+---
+
+## 卸载
+
+1. 打开 Claude Code → ⚙️ → **Manage Plugins** → **Plugins** 标签
+2. 找到 `weixin-album`，点击 **Uninstall**
+3. 切换到 **Marketplaces** 标签，移除 `weixin-album-mcp` 市场（可选）
+
+---
+
+## 手动安装（不使用插件市场）
 
 ```bash
 # 1. 克隆仓库
