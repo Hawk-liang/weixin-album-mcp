@@ -25,7 +25,7 @@ async function downloadImage(
   page: import('playwright').Page,
   imgUrl: string,
   savePath: string,
-): Promise<void> {
+): Promise<string | undefined> {
   if (imgUrl.startsWith('data:')) {
     // Data URI — extract base64 content
     const match = imgUrl.match(/^data:image\/(\w+);base64,(.+)$/);
@@ -33,8 +33,9 @@ async function downloadImage(
       const ext = match[1] === 'jpeg' ? 'jpg' : match[1];
       const data = Buffer.from(match[2], 'base64');
       fs.writeFileSync(savePath.replace(/\.\w+$/, `.${ext}`), data);
+      return ext;
     }
-    return;
+    return undefined;
   }
 
   // HTTP URL — fetch via the page context (handles cookies/referrer)
@@ -51,12 +52,15 @@ async function downloadImage(
     });
   }, imgUrl);
 
-  if (!response) return;
+  if (!response) return undefined;
 
-  const base64Match = response.match(/^data:.+;base64,(.+)$/);
+  const base64Match = response.match(/^data:image\/(\w+);base64,(.+)$/);
   if (base64Match) {
-    fs.writeFileSync(savePath, Buffer.from(base64Match[1], 'base64'));
+    const ext = base64Match[1] === 'jpeg' ? 'jpg' : base64Match[1];
+    fs.writeFileSync(savePath.replace(/\.\w+$/, `.${ext}`), Buffer.from(base64Match[2], 'base64'));
+    return ext;
   }
+  return undefined;
 }
 
 // ============================================================
@@ -101,7 +105,7 @@ export async function downloadArticle(
     });
 
     // Extract article content as Markdown-like text
-    const markdown = await page.evaluate(() => {
+    let markdown = await page.evaluate(() => {
       const content = document.querySelector('#js_content');
       if (!content) return '';
 
@@ -212,10 +216,16 @@ export async function downloadArticle(
       const imgUrl = src || dataSrc;
       if (!imgUrl) continue;
 
-      const ext = '.png'; // default
-      const imgPath = path.join(imagesDir, `img_${String(i + 1).padStart(3, '0')}${ext}`);
+      const imgName = `img_${String(i + 1).padStart(3, '0')}`;
+      const imgPath = path.join(imagesDir, `${imgName}.png`);
       try {
-        await downloadImage(page, imgUrl, imgPath);
+        const actualExt = await downloadImage(page, imgUrl, imgPath);
+        if (actualExt && actualExt !== 'png') {
+          markdown = markdown.replace(
+            new RegExp(`${imgName}\\.png`, 'g'),
+            `${imgName}.${actualExt}`,
+          );
+        }
       } catch {
         // Skip failed images
       }
@@ -225,20 +235,19 @@ export async function downloadArticle(
     const mdPath = path.join(articleDir, `${safeTitle}.md`);
     fs.writeFileSync(mdPath, markdown, 'utf-8');
 
-    await browser.close();
-
     return {
       success: true,
       localPath: path.relative(outputDir, mdPath),
     };
   } catch (err) {
-    if (browser) {
-      try { await browser.close(); } catch { /* ignore */ }
-    }
     return {
       success: false,
       localPath: null,
       error: err instanceof Error ? err.message : String(err),
     };
+  } finally {
+    if (browser) {
+      try { await browser.close(); } catch { /* ignore */ }
+    }
   }
 }
