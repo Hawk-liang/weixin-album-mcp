@@ -1,5 +1,5 @@
 {
-  "name": "opencli-weixin-album-mcp",
+  "name": "weixin-album-mcp",
   "version": "1.0.0",
   "description": "MCP server — fetch WeChat Official Account album articles, download with Playwright, generate Markdown index",
   "license": "MIT",

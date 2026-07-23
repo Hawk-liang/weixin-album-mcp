@@ -1,4 +1,4 @@
-# opencli-weixin-album-mcp
+# weixin-album-mcp
 
 MCP server -- fetch all articles from a WeChat Official Account album (合集), download them
 with Playwright headless Chromium, and generate a Markdown index file with local paths.
@@ -24,10 +24,10 @@ Port of [opencli-weixin-album](https://github.com/SlowGrowth1314/opencli-weixin-
 
 ```bash
 # 1. 先添加本仓库为插件市场
-/plugin marketplace add <你的用户名>/opencli-weixin-album-mcp
+/plugin marketplace add Hawk-liang/weixin-album-mcp
 
 # 2. 安装插件
-/plugin install weixin-album@opencli-weixin-album-mcp
+/plugin install weixin-album@weixin-album-mcp
 ```
 
 插件会自动安装并注册 MCP 服务器，无需手动配置。
@@ -36,8 +36,8 @@ Port of [opencli-weixin-album](https://github.com/SlowGrowth1314/opencli-weixin-
 
 ```bash
 # 1. 克隆仓库
-git clone https://github.com/Hawk-liang/opencli-weixin-album-mcp.git
-cd opencli-weixin-album-mcp
+git clone https://github.com/Hawk-liang/weixin-album-mcp.git
+cd weixin-album-mcp
 
 # 2. 安装依赖
 npm install
@@ -49,7 +49,7 @@ npx playwright install chromium
 ## Register with Claude Code
 
 ```bash
-claude mcp add weixin-album -- node /path/to/opencli-weixin-album-mcp/dist/index.js
+claude mcp add weixin-album -- node /path/to/weixin-album-mcp/dist/index.js
 ```
 
 Or add to `~/.claude/settings.json` manually:
@@ -59,7 +59,7 @@ Or add to `~/.claude/settings.json` manually:
   "mcpServers": {
     "weixin-album": {
       "command": "node",
-      "args": ["/path/to/opencli-weixin-album-mcp/dist/index.js"]
+      "args": ["/path/to/weixin-album-mcp/dist/index.js"]
     }
   }
 }

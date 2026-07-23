@@ -5,8 +5,8 @@
   "author": {
     "name": "WeChat Album MCP"
   },
-  "homepage": "https://github.com/Hawk-liang/opencli-weixin-album-mcp",
-  "repository": "https://github.com/Hawk-liang/opencli-weixin-album-mcp",
+  "homepage": "https://github.com/Hawk-liang/weixin-album-mcp",
+  "repository": "https://github.com/Hawk-liang/weixin-album-mcp",
   "license": "MIT",
   "keywords": ["wechat", "weixin", "album", "download", "markdown", "mcp"]
 }
