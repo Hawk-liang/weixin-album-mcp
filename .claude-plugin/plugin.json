@@ -1,0 +1,12 @@
+{
+  "name": "weixin-album",
+  "description": "获取微信公众号合集的所有文章，自动下载内容与图片，生成 Markdown 索引。支持增量下载断点续传。",
+  "version": "1.0.0",
+  "author": {
+    "name": "WeChat Album MCP"
+  },
+  "homepage": "https://github.com/<user>/opencli-weixin-album-mcp",
+  "repository": "https://github.com/<user>/opencli-weixin-album-mcp",
+  "license": "MIT",
+  "keywords": ["wechat", "weixin", "album", "download", "markdown", "mcp"]
+}
