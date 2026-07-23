@@ -79,7 +79,7 @@ export async function downloadArticle(
   articleUrl: string,
   outputDir: string,
 ): Promise<DownloadResult> {
-  let browser;
+  let browser: import('playwright').Browser | undefined;
   try {
     browser = await chromium.launch({ headless: true });
     const context = await browser.newContext({
@@ -108,20 +108,14 @@ export async function downloadArticle(
       // Clone to avoid mutating the live DOM
       const clone = content.cloneNode(true) as HTMLElement;
 
-      // Process images — replace lazy-load data-src with src
-      clone.querySelectorAll('img').forEach((img) => {
+      // Process images — replace lazy-load data-src with src and assign indices
+      clone.querySelectorAll('img').forEach((img, idx) => {
         const dataSrc = img.getAttribute('data-src');
         if (dataSrc && !img.getAttribute('src')) {
           img.setAttribute('src', dataSrc);
         }
-      });
-
-      // Collect image URLs for downloading
-      const imgUrls: string[] = [];
-      clone.querySelectorAll('img').forEach((img, idx) => {
-        const src = img.getAttribute('src');
+        const src = img.getAttribute('src') || img.getAttribute('data-src');
         if (src) {
-          imgUrls.push(src);
           img.setAttribute('data-img-index', String(idx));
         }
       });
@@ -137,11 +131,44 @@ export async function downloadArticle(
         'P', 'DIV', 'SECTION', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'BLOCKQUOTE', 'PRE',
       ]);
 
-      let node: Node | null = clone;
+      // Track formatting state for bold/italic since TreeWalker has no exit callback.
+      // Markers are opened/closed based on the ancestor chain of each text node.
+      let isBold = false;
+      let isItalic = false;
+
+      function getFormatting(node: Node): { bold: boolean; italic: boolean } {
+        let bold = false;
+        let italic = false;
+        let current: Node | null = node.parentNode;
+        while (current && current !== clone) {
+          if (current.nodeType === Node.ELEMENT_NODE) {
+            const tag = (current as HTMLElement).tagName;
+            if (tag === 'STRONG' || tag === 'B') bold = true;
+            else if (tag === 'EM' || tag === 'I') italic = true;
+          }
+          current = current.parentNode;
+        }
+        return { bold, italic };
+      }
+
+      // Start from the first child of the container, not the container itself,
+      // to avoid leading newlines from the root block element.
+      let node: Node | null = walker.nextNode();
       while (node) {
         if (node.nodeType === Node.TEXT_NODE) {
           const t = node.textContent || '';
-          if (t.trim()) text += t;
+          if (t.trim()) {
+            const fmt = getFormatting(node);
+            // Close markers in reverse order when leaving a formatting element
+            if (isItalic && !fmt.italic) text += '*';
+            if (isBold && !fmt.bold) text += '**';
+            // Open markers (bold outer, italic inner)
+            if (!isBold && fmt.bold) text += '**';
+            if (!isItalic && fmt.italic) text += '*';
+            isBold = fmt.bold;
+            isItalic = fmt.italic;
+            text += t;
+          }
         } else if (node.nodeType === Node.ELEMENT_NODE) {
           const el = node as HTMLElement;
           const tag = el.tagName;
@@ -154,24 +181,19 @@ export async function downloadArticle(
             text += `\n\n![${alt}](images/img_${String(Number(idx) + 1).padStart(3, '0')}.png)\n\n`;
           } else if (tag === 'A') {
             const href = el.getAttribute('href') || '';
-            text += `[`;
-            // Walk children for link text
-            for (const child of el.childNodes) {
-              if (child.nodeType === Node.TEXT_NODE) {
-                text += child.textContent || '';
-              }
-            }
-            text += `](${href})`;
+            const linkText = el.textContent?.trim() || '';
+            text += `[${linkText}](${href})`;
           } else if (blockTags.has(tag)) {
             text += '\n\n';
-          } else if (tag === 'STRONG' || tag === 'B') {
-            text += '**';
-          } else if (tag === 'EM' || tag === 'I') {
-            text += '*';
           }
+          // STRONG, B, EM, I are handled via getFormatting on text nodes
         }
         node = walker.nextNode();
       }
+
+      // Close any formatting markers that are still open at the end of the document
+      if (isItalic) text += '*';
+      if (isBold) text += '**';
 
       // Clean up excessive newlines
       return text.replace(/\n{3,}/g, '\n\n').trim();
