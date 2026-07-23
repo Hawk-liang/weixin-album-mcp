@@ -23,8 +23,11 @@ Port of [opencli-weixin-album](https://github.com/SlowGrowth1314/opencli-weixin-
 ### 方式一：Claude Code 插件市场安装（推荐）
 
 ```bash
-# 在 Claude Code 中输入：
-/plugin install weixin-album
+# 1. 先添加本仓库为插件市场
+/plugin marketplace add <你的用户名>/opencli-weixin-album-mcp
+
+# 2. 安装插件
+/plugin install weixin-album@opencli-weixin-album-mcp
 ```
 
 插件会自动安装并注册 MCP 服务器，无需手动配置。

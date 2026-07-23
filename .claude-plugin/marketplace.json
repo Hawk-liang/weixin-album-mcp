@@ -1,0 +1,21 @@
+{
+  "name": "opencli-weixin-album-mcp",
+  "description": "微信公众号合集文章下载工具 — MCP 插件市场",
+  "plugins": [
+    {
+      "name": "weixin-album",
+      "description": "获取微信公众号合集的所有文章，自动下载内容与图片，生成 Markdown 索引。支持增量下载断点续传。",
+      "version": "1.0.0",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/<你的用户名>/opencli-weixin-album-mcp.git"
+      },
+      "authors": [
+        {
+          "name": "<你的名字>"
+        }
+      ],
+      "keywords": ["wechat", "weixin", "album", "download", "markdown", "mcp"]
+    }
+  ]
+}
